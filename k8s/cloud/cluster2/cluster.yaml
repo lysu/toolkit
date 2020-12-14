@@ -1,0 +1,126 @@
+apiVersion: core.tidbcloud.com/v1alpha1
+kind: Cluster
+metadata:
+  name: test5k
+  namespace: robi5k
+spec:
+  parameters:
+    # generateName specify the name prefix of the cluster, required
+    name: test5k
+
+    # options: [aws, gcp], required
+    provider: aws
+
+    # options: aws - [us-west-2], gcp - [us-west1], required
+    region: us-west-2
+
+    # options: [t1.tiny, t1.standard], required
+    tier: t1.standard
+
+    # sql interface whitelist ips, optional, default to deny all public access
+    sourceRanges:
+      - 0.0.0.0/0
+
+    # cluster version, optional, default to TiDB Cloud's default
+    version: nightly
+    initPassword: cleartext
+
+    tidb:
+
+      # TiDB replicas, required, must > 1
+      replicas: 2
+
+      # TiDB config, optional, this config will overlay to TiDB Cloud's defaults, DO NOT edit any configuration related
+      # to TLS
+#      rawConfig: |
+#        [log]
+#          level = "info"
+#          expensive-threshold = 50000000
+#
+#        [pessimistic-txn]
+#          enable = true
+#
+#        [prepared-plan-cache]
+#          enabled = true
+
+      # optional, default to pingcap/tidb
+      # baseImage: pingcap/tidb
+
+      # optional, default to .spec.version
+      # version: nightly
+
+    tikv:
+      # TiKV replicas, required, must be a multiple of 3
+      replicas: 3
+
+      # TiKV config, optional, this config will overlay to TiDB Cloud's defaults, DO NOT edit any configuration related
+      # to TLS and TDE
+#      rawConfig: |
+#        [readpool]
+#          high-concurrency = 1
+#          normal-concurrency = 5
+#          low-concurrency = 1
+#          unifiy-read-pool = true
+#          [readpool.unified]
+#            min-thread-count = 5
+#            max-thread-count = 6
+#          [readpool.storage]
+#            use-unified-pool = true
+#            low-concurrency = 1
+#            high-concurrency = 1
+#            normal-concurrency = 4
+#          [readpool.coprocessor]
+#            low-concurrency = 1
+#            normal-concurrency = 5
+#            high-concurrency = 1
+#
+#        [storage]
+#          scheduler-worker-pool-size = 4
+#          [storage.block-cache]
+#            shared = true
+#            num-shard-bits = 6
+#            strict-capacity-limit = false
+#            high-pri-pool-ratio = 0.8
+#            memory-allocator = "nodump"
+#
+#        [raftstore]
+#          apply-pool-size = 3
+#          store-pool-size = 3
+#
+#        [rocksdb]
+#          max-background-jobs = 4
+#
+#        [raftdb]
+#          max-background-jobs = 3
+#          allow-concurrent-memtable-write = true
+#
+#        [server]
+#          allow-concurrent-memtable-write = false
+#          end-point-max-concurrency = 10
+#          grpc-concurrency = 6
+#
+#        [pessimistic-txn]
+#          pipelined = true
+
+      # optional, default to pingcap/tikv
+      # baseImage: pingcap/tikv
+
+      # optional, default to .spec.version, can be any valid image tag
+      # version: nightly
+    pd:
+      # PD config, optional, this config will overlay to TiDB Cloud's defaults
+      # rawConfig: ""
+
+      # optional, default to pingcap/pd
+      # baseImage: pingcap/pd
+
+      replicas: 3
+
+    # optional, default to .spec.version, can be any valid image tag
+    # version: nightly
+
+  providerConfigRef:
+    name: dbaas-stability
+  writeConnectionSecretToRef:
+    name: password
+    namespace: robi5k

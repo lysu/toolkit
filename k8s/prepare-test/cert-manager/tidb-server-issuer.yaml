@@ -1,0 +1,29 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: ${cluster_name}-selfsigned-ca-issuer
+  namespace: ${namespace}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: ${cluster_name}-ca
+  namespace: ${namespace}
+spec:
+  secretName: ${cluster_name}-ca-secret
+  commonName: "TiDB CA"
+  isCA: true
+  issuerRef:
+    name: ${cluster_name}-selfsigned-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: ${cluster_name}-tidb-issuer
+  namespace: ${namespace}
+spec:
+  ca:
+    secretName: ${cluster_name}-ca-secret

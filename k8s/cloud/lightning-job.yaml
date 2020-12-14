@@ -1,0 +1,123 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lightning
+  labels:
+    app: lightning
+spec:
+  backoffLimit: 0
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: lightning
+    spec:
+      nodeSelector:
+        pool: benchmark
+      tolerations:
+        - effect: NoSchedule
+          key: dedicated
+          operator: Equal
+          value: benchmark
+      containers:
+        - name: lightning
+          image: pingcap/tidb-lightning:nightly
+          volumeMounts:
+            - mountPath: /data
+              name: tpcc-csv-data
+            - mountPath: /var/lib/tidb-tls
+              name: tidb-tls
+              readOnly: true
+          command:
+            - /bin/sh
+            - -c
+            - |-
+              set -x
+              apk add wget
+              wget https://github.com/lysu/go-tpc/releases/download/v2.0.0/go-tpc
+              chmod +x go-tpc
+              /go-tpc tpcc -H ${TIDB_HOST} -P ${TIDB_PORT} -p ${PASSWORD} -D tpcc --warehouses ${WAREHOUSES} -T 100 prepare --output-type csv --output-dir /data/tpcc-data
+              cat > tidb-lightning.toml<<EOF
+              [lightning]
+              level = "info"
+              file = "/data/tidb-lightning.log"
+
+              [tikv-importer]
+              backend = "local"
+              "sorted-kv-dir" = "/data/sorted-kv-dir"
+
+              [mydumper]
+              data-source-dir = "/data/tpcc-data"
+              no-schema = true
+              strict-format = true
+
+              [mydumper.csv]
+              separator = ','
+              delimiter = ''
+              header = false
+              not-null = true
+              null = '\N'
+              backslash-escape = true
+              trim-last-separator = false
+
+              [security]
+              # Specifies certificates and keys for TLS connections within the cluster.
+              # Public certificate of the CA. Leave empty to disable TLS.
+              ca-path = "/var/lib/tidb-tls/ca.crt"
+              # Public certificate of this service.
+              cert-path = "/var/lib/tidb-tls/tls.crt"
+              # Private key of this service.
+              key-path = "/var/lib/tidb-tls/tls.key"
+
+              [checkpoint]
+              enable = true
+
+              [tidb]
+              host = "${TIDB_HOST}"
+              port = ${TIDB_PORT}
+              user = "root"
+              password = "${PASSWORD}"
+              status-port = 10080
+
+              # Specifies certificates and keys for TLS-enabled MySQL connections.
+              # Defaults to a copy of the [security] section.
+              [tidb.security]
+              # Public certificate of the CA. Set to empty string to disable TLS for SQL.
+              ca-path = ""
+              # Public certificate of this service. Default to copy of `security.cert-path`
+              cert-path = ""
+              # Private key of this service. Default to copy of `security.key-path`
+              key-path = ""
+              EOF
+              /tidb-lightning -config tidb-lightning.toml -check-requirements=false
+          env:
+            - name: TIDB_HOST
+              value: "${ENV_TIDB_HOST}"
+            - name: TIDB_PORT
+              value: "${ENV_TIDB_PORT}"
+            - name: PASSWORD
+              value: "${ENV_PASSWORD}"
+            - name: WAREHOUSES
+              value: "10000"
+      restartPolicy: Never
+      volumes:
+        - name: tpcc-csv-data
+          persistentVolumeClaim:
+            claimName: tpcc-csv-data
+        - name: tidb-tls
+          secret:
+            defaultMode: 420
+            secretName: db-cluster-client-secret
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tpcc-csv-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2000Gi
+  storageClassName: cloud-ssd
+  volumeMode: Filesystem

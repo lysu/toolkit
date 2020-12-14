@@ -1,0 +1,110 @@
+metadata:
+  name: tidbcloud-niglty
+  namespace: argo
+  selfLink: /apis/argoproj.io/v1alpha1/namespaces/argo/workflowtemplates/tidbcloud
+  uid: b56e4fb5-293a-47d1-bcd5-5ad1b9f23876
+  resourceVersion: '121247413'
+  generation: 1
+  creationTimestamp: '2020-11-03T08:10:10Z'
+  labels:
+    app.kubernetes.io/managed-by: pulumi
+    type: util
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"WorkflowTemplate","metadata":{"labels":{"app.kubernetes.io/managed-by":"pulumi","type":"util"},"name":"tidbcloud","namespace":"argo"},"spec":{"templates":[{"inputs":{"parameters":[{"default":"{{workflow.parameters.tier}}","name":"tier"},{"default":"{{workflow.parameters.provider}}","name":"provider"},{"default":"{{workflow.parameters.region}}","name":"region"},{"default":"{{workflow.parameters.tikv-version}}","name":"tikv-version"},{"default":"{{workflow.parameters.tidb-version}}","name":"tidb-version"},{"default":"{{workflow.parameters.pd-version}}","name":"pd-version"},{"default":"{{workflow.parameters.tidb-config}}","name":"tidb-config"},{"default":"{{workflow.parameters.pd-config}}","name":"pd-config"},{"default":"{{workflow.parameters.tikv-config}}","name":"tikv-config"}]},"name":"with-cluster","outputs":{"parameters":[{"globalName":"tidb-kubeconfig-secret","name":"kubeconfig-secret","valueFrom":{"jsonPath":"{.status.kubeconfigSecret.name}"}},{"globalName":"tidb-password","name":"password","valueFrom":{"jsonPath":"{.spec.parameters.initPassword}"}},{"globalName":"tidb-host","name":"host","valueFrom":{"jsonPath":"{.status.host}"}},{"globalName":"tidb-id","name":"id","valueFrom":{"jsonPath":"{.status.id}"}},{"globalName":"tidb-port","name":"port","valueFrom":{"jsonPath":"{.status.port}"}}]},"resource":{"action":"create","manifest":"apiVersion:
+      core.tidbcloud.com/v1alpha1\nkind: Cluster\nmetadata:\n  generateName:
+      tidb-\n  namespace: argo\nspec:\n  providerConfigRef:\n    name:
+      dbaas-stability\n  parameters:\n    generateName: bench-\n    provider:
+      {{inputs.parameters.provider}}\n    region:
+      {{inputs.parameters.region}}\n    tier: {{inputs.parameters.tier}}\n
+      tidb:\n      replicas: 2\n      versionOverride:
+      {{inputs.parameters.tidb-version}}\n      rawConfig:
+      \"{{inputs.parameters.tidb-config}}\"\n    tikv:\n      replicas: 3\n
+      versionOverride: {{inputs.parameters.tikv-version}}\n      rawConfig:
+      \"{{inputs.parameters.tikv-config}}\"\n    pd:\n      replicas: 3\n
+      versionOverride: {{inputs.parameters.pd-version}}\n      rawConfig:
+      \"{{inputs.parameters.pd-config}}\"\n    version: v4.0.7\n
+      initPassword:
+      cleartext\n","setOwnerReference":true,"successCondition":"status.initialized
+      == true"}}]}}
+spec:
+  templates:
+    - name: with-cluster
+      arguments: {}
+      inputs:
+        parameters:
+          - name: tier
+            default: '{{workflow.parameters.tier}}'
+          - name: provider
+            default: '{{workflow.parameters.provider}}'
+          - name: region
+            default: '{{workflow.parameters.region}}'
+          - name: tikv-version
+            default: '{{workflow.parameters.tikv-version}}'
+          - name: tidb-version
+            default: '{{workflow.parameters.tidb-version}}'
+          - name: pd-version
+            default: '{{workflow.parameters.pd-version}}'
+          - name: tidb-config
+            default: '{{workflow.parameters.tidb-config}}'
+          - name: pd-config
+            default: '{{workflow.parameters.pd-config}}'
+          - name: tikv-config
+            default: '{{workflow.parameters.tikv-config}}'
+      outputs:
+        parameters:
+          - name: kubeconfig-secret
+            valueFrom:
+              jsonPath: '{.status.kubeconfigSecret.name}'
+            globalName: tidb-kubeconfig-secret
+          - name: password
+            valueFrom:
+              jsonPath: '{.spec.parameters.initPassword}'
+            globalName: tidb-password
+          - name: host
+            valueFrom:
+              jsonPath: '{.status.host}'
+            globalName: tidb-host
+          - name: id
+            valueFrom:
+              jsonPath: '{.status.id}'
+            globalName: tidb-id
+          - name: port
+            valueFrom:
+              jsonPath: '{.status.port}'
+            globalName: tidb-port
+      metadata: {}
+      resource:
+        action: create
+        manifest: |
+          apiVersion: core.tidbcloud.com/v1alpha1
+          kind: Cluster
+          metadata:
+            generateName: tidb-
+            namespace: argo
+          spec:
+            providerConfigRef:
+              name: dbaas-stability
+            parameters:
+              generateName: bench-
+              provider: {{inputs.parameters.provider}}
+              region: {{inputs.parameters.region}}
+              tier: {{inputs.parameters.tier}}
+              tidb:
+                replicas: 2
+                versionOverride: {{inputs.parameters.tidb-version}}
+                rawConfig: "{{inputs.parameters.tidb-config}}"
+              tikv:
+                replicas: 3
+                versionOverride: {{inputs.parameters.tikv-version}}
+                rawConfig: "{{inputs.parameters.tikv-config}}"
+              pd:
+                replicas: 3
+                versionOverride: {{inputs.parameters.pd-version}}
+                rawConfig: "{{inputs.parameters.pd-config}}"
+              version: nightly
+              initPassword: cleartext
+        setOwnerReference: true
+        successCondition: status.initialized == true
+  arguments: {}
+

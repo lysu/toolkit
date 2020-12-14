@@ -1,0 +1,31 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: ${cluster_name}-tidb-server-secret
+  namespace: ${namespace}
+spec:
+  secretName: ${cluster_name}-tidb-server-secret
+  duration: 8760h # 365d
+  renewBefore: 360h # 15d
+  organization:
+    - PingCAP
+  commonName: "TiDB Server"
+  usages:
+    - server auth
+  dnsNames:
+    - "${cluster_name}-tidb"
+    - "${cluster_name}-tidb.${namespace}"
+    - "${cluster_name}-tidb.${namespace}.svc"
+    - "*.${cluster_name}-tidb"
+    - "*.${cluster_name}-tidb.${namespace}"
+    - "*.${cluster_name}-tidb.${namespace}.svc"
+    - "*.${cluster_name}-tidb-peer"
+    - "*.${cluster_name}-tidb-peer.${namespace}"
+    - "*.${cluster_name}-tidb-peer.${namespace}.svc"
+  ipAddresses:
+    - 127.0.0.1
+    - ::1
+  issuerRef:
+    name: ${cluster_name}-tidb-issuer
+    kind: Issuer
+    group: cert-manager.io

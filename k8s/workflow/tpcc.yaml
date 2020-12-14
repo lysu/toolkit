@@ -1,0 +1,520 @@
+metadata:
+  name: tpcc-robi
+  namespace: argo
+  selfLink: /apis/argoproj.io/v1alpha1/namespaces/argo/workflowtemplates/tpcc
+  uid: d18a9f4a-61fa-4dd2-bb34-fca6d89b148a
+  resourceVersion: '121247400'
+  generation: 1
+  creationTimestamp: '2020-11-03T08:10:09Z'
+  labels:
+    app.kubernetes.io/managed-by: pulumi
+    benchmark: tpcc
+    type: bench
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"WorkflowTemplate","metadata":{"labels":{"app.kubernetes.io/managed-by":"pulumi","benchmark":"tpcc","type":"bench"},"name":"tpcc","namespace":"argo"},"spec":{"arguments":{"parameters":[{"name":"tier","value":"t1.standard"},{"name":"region","value":"us-west-2"},{"name":"provider","value":"aws"},{"name":"repeats","value":"1"},{"name":"warehouses","value":"1000"},{"name":"duration","value":"10m"},{"name":"terminals","value":"100"},{"name":"tikv-version","value":"v4.0.7"},{"name":"tidb-version","value":"v4.0.7"},{"name":"pd-version","value":"v4.0.7"},{"name":"tidb-config","value":""},{"name":"pd-config","value":""},{"name":"tikv-config","value":""},{"name":"suite","value":"default"}]},"entrypoint":"bench-adhoc","podGC":{"strategy":"OnPodCompletion"},"serviceAccountName":"workflow","templates":[{"name":"bench-10K","steps":[[{"name":"setup","templateRef":{"name":"tidbcloud","template":"with-cluster"}}],[{"arguments":{"parameters":[{"name":"kubeconfig-secret","value":"{{workflow.outputs.parameters.tidb-kubeconfig-secret}}"},{"name":"ns","value":"tidb{{workflow.outputs.parameters.tidb-id}}"}]},"name":"restore","templateRef":{"name":"dataset","template":"tpcc-10000"}}],[{"arguments":{"parameters":[{"name":"repeats","value":"{{workflow.parameters.repeats}}"},{"name":"warehouses","value":"{{steps.restore.outputs.parameters.scale}}"}]},"name":"bench","template":"bench-cycle"}]]},{"name":"bench-adhoc","steps":[[{"name":"setup","templateRef":{"name":"tidbcloud","template":"with-cluster"}}],[{"arguments":{"parameters":[{"name":"repeats","value":"{{workflow.parameters.repeats}}"}]},"name":"bench","template":"adhoc-cycle"}]]},{"inputs":{"parameters":[{"default":"1","name":"repeats"}]},"name":"adhoc-cycle","parallelism":1,"steps":[[{"arguments":{"parameters":[{"name":"action","value":"prepare"}]},"name":"prepare","template":"tpcc"}],[{"arguments":{"parameters":[{"name":"id","value":"{{item}}"}]},"name":"loop","template":"run-and-collect","withSequence":{"count":"{{inputs.parameters.repeats}}"}}],[{"arguments":{"parameters":[{"name":"action","value":"check"}]},"name":"check","template":"tpcc"}]]},{"inputs":{"parameters":[{"default":"1","name":"repeats"},{"default":"{{workflow.parameters.warehouses}}","name":"warehouse"}]},"name":"bench-cycle","parallelism":1,"steps":[[{"arguments":{"parameters":[{"name":"id","value":"{{item}}"},{"name":"warehouses","value":"{{inputs.parameters.warehouse}}"}]},"name":"loop","template":"run-and-collect","withSequence":{"count":"{{inputs.parameters.repeats}}"}}],[{"arguments":{"parameters":[{"name":"action","value":"check"},{"name":"warehouses","value":"{{inputs.parameters.warehouse}}"}]},"name":"check","template":"tpcc"}]]},{"inputs":{"parameters":[{"default":"0","name":"id"},{"default":"{{workflow.parameters.warehouses}}","name":"warehouses"}]},"name":"run-and-collect","steps":[[{"arguments":{"parameters":[{"name":"action","value":"run"},{"name":"id","value":"{{inputs.parameters.id}}"},{"name":"warehouses","value":"{{inputs.parameters.warehouses}}"}]},"name":"run","template":"tpcc"}],[{"arguments":{"artifacts":[{"from":"{{steps.run.outputs.artifacts.job-log}}","name":"result"}],"parameters":[{"name":"mongo-secret","value":"mongo-secret"},{"name":"warehouses","value":"{{inputs.parameters.warehouses}}"}]},"name":"save","template":"collect"}]]},{"inputs":{"parameters":[{"default":"run","name":"action"},{"default":"","name":"id"}]},"name":"tpcc","outputs":{"artifacts":[{"from":"{{steps.run-job.outputs.artifacts.job-log}}","name":"job-log"}]},"steps":[[{"arguments":{"parameters":[{"name":"action","value":"{{inputs.parameters.action}}"},{"name":"id","value":"{{inputs.parameters.id}}"}]},"name":"generate-job","template":"gen-job"}],[{"arguments":{"artifacts":[{"from":"{{steps.generate-job.outputs.artifacts.job-spec}}","name":"manifest"}],"parameters":[{"name":"kubeconfig-secret","value":"{{workflow.outputs.parameters.tidb-kubeconfig-secret}}"},{"name":"timeout","value":"12h"},{"name":"ns","value":"default"}]},"name":"run-job","templateRef":{"name":"utilities","template":"apply-job-and-wait"}}]]},{"inputs":{"artifacts":[{"name":"result","path":"/tmp/result.log"}],"parameters":[{"name":"mongo-secret"},{"name":"warehouses"}]},"name":"collect","script":{"command":["python"],"env":[{"name":"MONGO_DSN","valueFrom":{"secretKeyRef":{"key":"dsn","name":"{{inputs.parameters.mongo-secret}}"}}}],"image":"aylei/pymongo:latest","source":"import
+      json\nimport pymongo\nimport re\nimport os\nfrom datetime import
+      datetime\n\nreport = {}\n\nresult = {}\nwith open('/tmp/result.log') as
+      f:\n    content = f.read()\n    lines = content.split(\"\\n\")\n    for l
+      in lines:\n        m =
+      re.match(r'\\[Summary\\]\\s([\\s\\S]+)\\s-\\s(Takes.*)', l)\n        if m
+      is None:\n            continue\n        o = {}\n        pairs =
+      m.group(2).split(',')\n        for pair in pairs:\n            kv =
+      pair.split(':')\n            o[kv[0].strip().replace('.', \"\")] =
+      float(kv[1].strip())\n        result[m.group(1)] = o\nreport['result'] =
+      result\n\ntidb = {\n    'tidb': {\n        'version':
+      \"{{workflow.parameters.tidb-version}}\",\n        'machine':
+      \"dummy\"\n    },\n    'pd': {\n        'version':
+      \"{{workflow.parameters.tidb-version}}\",\n        'machine':
+      \"dummy\"\n    },\n    'tikv': {\n        'version':
+      \"{{workflow.parameters.tidb-version}}\",\n        'machine':
+      \"dummy\"\n    },\n    'tier': \"{{workflow.parameters.tier}}\",\n
+      'provider': \"{{workflow.parameters.provider}}\",\n    'region':
+      \"{{workflow.parameters.region}}\",\n    'id':
+      \"{{workflow.outputs.parameters.tidb-id}}\",\n}\n# with open('tidb.json')
+      as f:\n#     tc = json.load(f)\n#     spec = tc['spec']\n#
+      tidb['tidb']['config'] = spec['tidb']['config']\n#
+      tidb['tikv']['config'] = spec['tikv']['config']\nreport['tidb'] =
+      tidb\n\ntpcc = {}\ntpcc['warehouses'] =
+      {{inputs.parameters.warehouses}}\ntpcc['terminals'] =
+      {{workflow.parameters.terminals}}\ntpcc['duration'] =
+      \"{{workflow.parameters.duration}}\"\nreport['tpcc'] =
+      tpcc\n\nreport['time'] = datetime.now()\nreport['suite'] =
+      \"{{workflow.parameters.suite}}\"\n\nmc =
+      pymongo.MongoClient(os.environ['MONGO_DSN'], ssl=True,
+      ssl_cert_reqs='CERT_NONE')\ncollection =
+      mc[\"test\"][\"tpcc\"]\ncollection.insert_one(report)\n"}},{"inputs":{"parameters":[{"default":"run","name":"action"},{"default":"","name":"id"},{"default":"{{workflow.parameters.warehouses}}","name":"warehouses"}]},"name":"gen-job","outputs":{"artifacts":[{"name":"job-spec","path":"/tmp/job.yaml"}]},"script":{"command":["bash"],"image":"bash","source":"cat
+      \u003c\u003c EOF \u003e /tmp/job.yaml\napiVersion: batch/v1\nkind:
+      Job\nmetadata:\n  name:
+      tpcc{{inputs.parameters.id}}-{{inputs.parameters.action}}-{{workflow.uid}}\n
+      labels:\n    app: tpcc\nspec:\n  backoffLimit: 0\n  parallelism: 1\n
+      template:\n    metadata:\n      labels:\n        app: tpcc\n
+      spec:\n      nodeSelector:\n        pool: benchmark\n
+      tolerations:\n      - effect: NoSchedule\n        key: dedicated\n
+      operator: Equal\n        value: benchmark\n      containers:\n        -
+      name: tpcc\n          image: aylei/go-tpc:20201027\n
+      command:\n            - /bin/sh\n            - -c\n            -
+      |-\n              set -x\n              set -euo pipefail\n
+      elapseTime=0\n              threshold=600\n              while true;
+      do\n                  sleep 5\n                  elapseTime=\\$((
+      elapseTime+5 ))\n\n                  if [[ \\${elapseTime} -ge
+      \\${threshold} ]]\n                  then\n                      echo
+      \"waiting for TiDB endpoint ready timeout\"
+      \u003e\u00262\n                      exit 1\n
+      fi\n\n                  if nslookup \\${TIDB_HOST}
+      2\u003e/dev/null\n                  then\n                      echo
+      \"nslookup domain \\${TIDB_HOST} success\"\n
+      break\n                  else\n                      echo \"nslookup
+      domain \\${TIDB_HOST} failed\" \u003e\u00262\n
+      fi\n              done\n              case \\${ACTION} in\n
+      prepare)\n                  mysql -h\\${TIDB_HOST} -P\\${TIDB_PORT}
+      -p\\${PASSWORD} -e \"DROP DATABASE IF EXISTS tpcc; CREATE DATABASE
+      tpcc;\"\n                  /go-tpc -H=\\${TIDB_HOST} -P=\\${TIDB_PORT}
+      -p=\\${PASSWORD} -D=tpcc --warehouses=\\${WAREHOUSES} tpcc
+      prepare\n                  ;;\n                run)\n
+      /go-tpc -H=\\${TIDB_HOST} -P=\\${TIDB_PORT} -p=\\${PASSWORD} -D=tpcc
+      --warehouses=\\${WAREHOUSES} --time=\\${DURATION} --ignore-error tpcc
+      run\n                  ;;\n                check)\n
+      /go-tpc -H=\\${TIDB_HOST} -P=\\${TIDB_PORT} -p=\\${PASSWORD} -D=tpcc
+      --warehouses=\\${WAREHOUSES} tpcc check\n
+      ;;\n              esac\n          env:\n            - name:
+      TIDB_HOST\n              value:
+      \"db-tidb.tidb{{workflow.outputs.parameters.tidb-id}}\"\n            -
+      name: TIDB_PORT\n              value:
+      \"{{workflow.outputs.parameters.tidb-port}}\"\n            - name:
+      PASSWORD\n              value:
+      \"{{workflow.outputs.parameters.tidb-password}}\"\n            - name:
+      WAREHOUSES\n              value:
+      \"{{inputs.parameters.warehouses}}\"\n            - name:
+      DURATION\n              value:
+      \"{{workflow.parameters.duration}}\"\n            - name:
+      TERMINALS\n              value:
+      \"{{workflow.parameters.terminals}}\"\n            - name:
+      ACTION\n              value: \"{{inputs.parameters.action}}\"\n
+      restartPolicy:
+      Never\nEOF\n"}}],"ttlStrategy":{"secondsAfterCompletion":121}}}
+spec:
+  templates:
+    - name: bench-10K
+      arguments: {}
+      inputs: {}
+      outputs: {}
+      metadata: {}
+      steps:
+        - - name: setup
+            arguments: {}
+            templateRef:
+              name: tidbcloud
+              template: with-cluster
+        - - name: restore
+            arguments:
+              parameters:
+                - name: kubeconfig-secret
+                  value: '{{workflow.outputs.parameters.tidb-kubeconfig-secret}}'
+                - name: ns
+                  value: 'tidb{{workflow.outputs.parameters.tidb-id}}'
+            templateRef:
+              name: dataset
+              template: tpcc-10000
+        - - name: bench
+            template: bench-cycle
+            arguments:
+              parameters:
+                - name: repeats
+                  value: '{{workflow.parameters.repeats}}'
+                - name: warehouses
+                  value: '{{steps.restore.outputs.parameters.scale}}'
+    - name: bench-adhoc
+      arguments: {}
+      inputs: {}
+      outputs: {}
+      metadata: {}
+      steps:
+        - - name: setup
+            arguments: {}
+            templateRef:
+              name: tidbcloud
+              template: with-cluster
+        - - name: bench
+            template: adhoc-cycle
+            arguments:
+              parameters:
+                - name: repeats
+                  value: '{{workflow.parameters.repeats}}'
+    - name: adhoc-cycle
+      arguments: {}
+      inputs:
+        parameters:
+          - name: repeats
+            default: '1'
+      outputs: {}
+      metadata: {}
+      steps:
+        - - name: prepare
+            template: tpcc
+            arguments:
+              parameters:
+                - name: action
+                  value: prepare
+        - - name: loop
+            template: run-and-collect
+            arguments:
+              parameters:
+                - name: id
+                  value: '{{item}}'
+            withSequence:
+              count: '{{inputs.parameters.repeats}}'
+        - - name: check
+            template: tpcc
+            arguments:
+              parameters:
+                - name: action
+                  value: check
+      parallelism: 1
+    - name: bench-cyclecollect
+      arguments: {}
+      inputs:
+        parameters:
+          - name: repeats
+            default: '1'
+          - name: warehouse
+            default: '{{workflow.parameters.warehouses}}'
+      outputs: {}
+      metadata: {}
+      steps:
+        - - name: loop
+            template: run-and-collect
+            arguments:
+              parameters:
+                - name: id
+                  value: '{{item}}'
+                - name: warehouses
+                  value: '{{inputs.parameters.warehouse}}'
+            withSequence:
+              count: '{{inputs.parameters.repeats}}'
+        - - name: check
+            template: tpcc
+            arguments:
+              parameters:
+                - name: action
+                  value: check
+                - name: warehouses
+                  value: '{{inputs.parameters.warehouse}}'
+      parallelism: 1
+    - name: run-and-collect
+      arguments: {}
+      inputs:
+        parameters:
+          - name: id
+            default: '0'
+          - name: warehouses
+            default: '{{workflow.parameters.warehouses}}'
+      outputs: {}
+      metadata: {}
+      steps:
+        - - name: run
+            template: tpcc
+            arguments:
+              parameters:
+                - name: action
+                  value: run
+                - name: id
+                  value: '{{inputs.parameters.id}}'
+                - name: warehouses
+                  value: '{{inputs.parameters.warehouses}}'
+        - - name: save
+            template: collect
+            arguments:
+              parameters:
+                - name: mongo-secret
+                  value: mongo-secret
+                - name: warehouses
+                  value: '{{inputs.parameters.warehouses}}'
+              artifacts:
+                - name: result
+                  from: '{{steps.run.outputs.artifacts.job-log}}'
+    - name: tpcc
+      arguments: {}
+      inputs:
+        parameters:
+          - name: action
+            default: run
+          - name: id
+            default: ''
+      outputs:
+        artifacts:
+          - name: job-log
+            from: '{{steps.run-job.outputs.artifacts.job-log}}'
+      metadata: {}
+      steps:
+        - - name: generate-job
+            template: gen-job
+            arguments:
+              parameters:
+                - name: action
+                  value: '{{inputs.parameters.action}}'
+                - name: id
+                  value: '{{inputs.parameters.id}}'
+        - - name: run-job
+            arguments:
+              parameters:
+                - name: kubeconfig-secret
+                  value: '{{workflow.outputs.parameters.tidb-kubeconfig-secret}}'
+                - name: timeout
+                  value: 12h
+                - name: ns
+                  value: default
+              artifacts:
+                - name: manifest
+                  from: '{{steps.generate-job.outputs.artifacts.job-spec}}'
+            templateRef:
+              name: utilities
+              template: apply-job-and-wait
+    - name: collect
+      arguments: {}
+      inputs:
+        parameters:
+          - name: mongo-secret
+          - name: warehouses
+        artifacts:
+          - name: result
+            path: /tmp/result.log
+      outputs: {}
+      metadata: {}
+      script:
+        name: ''
+        image: 'aylei/pymongo:latest'
+        command:
+          - python
+        env:
+          - name: MONGO_DSN
+            valueFrom:
+              secretKeyRef:
+                name: '{{inputs.parameters.mongo-secret}}'
+                key: dsn
+        resources: {}
+        source: >
+          import json
+
+          import pymongo
+
+          import re
+
+          import os
+
+          from datetime import datetime
+
+
+          report = {}
+
+
+          result = {}
+
+          with open('/tmp/result.log') as f:
+              content = f.read()
+              lines = content.split("\n")
+              for l in lines:
+                  m = re.match(r'\[Summary\]\s([\s\S]+)\s-\s(Takes.*)', l)
+                  if m is None:
+                      continue
+                  o = {}
+                  pairs = m.group(2).split(',')
+                  for pair in pairs:
+                      kv = pair.split(':')
+                      o[kv[0].strip().replace('.', "")] = float(kv[1].strip())
+                  result[m.group(1)] = o
+          report['result'] = result
+
+
+          tidb = {
+              'tidb': {
+                  'version': "{{workflow.parameters.tidb-version}}",
+                  'machine': "dummy"
+              },
+              'pd': {
+                  'version': "{{workflow.parameters.tidb-version}}",
+                  'machine': "dummy"
+              },
+              'tikv': {
+                  'version': "{{workflow.parameters.tidb-version}}",
+                  'machine': "dummy"
+              },
+              'tier': "{{workflow.parameters.tier}}",
+              'provider': "{{workflow.parameters.provider}}",
+              'region': "{{workflow.parameters.region}}",
+              'id': "{{workflow.outputs.parameters.tidb-id}}",
+          }
+
+          # with open('tidb.json') as f:
+
+          #     tc = json.load(f)
+
+          #     spec = tc['spec']
+
+          #     tidb['tidb']['config'] = spec['tidb']['config']
+
+          #     tidb['tikv']['config'] = spec['tikv']['config']
+
+          report['tidb'] = tidb
+
+
+          tpcc = {}
+
+          tpcc['warehouses'] = {{inputs.parameters.warehouses}}
+
+          tpcc['terminals'] = {{workflow.parameters.terminals}}
+
+          tpcc['duration'] = "{{workflow.parameters.duration}}"
+
+          report['tpcc'] = tpcc
+
+
+          report['time'] = datetime.now()
+
+          report['suite'] = "{{workflow.parameters.suite}}"
+
+
+          mc = pymongo.MongoClient(os.environ['MONGO_DSN'], ssl=True,
+          ssl_cert_reqs='CERT_NONE')
+
+          collection = mc["test"]["tpcc"]
+
+          collection.insert_one(report)
+    - name: gen-job
+      arguments: {}
+      inputs:
+        parameters:
+          - name: action
+            default: run
+          - name: id
+            default: ''
+          - name: warehouses
+            default: '{{workflow.parameters.warehouses}}'
+      outputs:
+        artifacts:
+          - name: job-spec
+            path: /tmp/job.yaml
+      metadata: {}
+      script:
+        name: ''
+        image: bash
+        command:
+          - bash
+        resources: {}
+        source: |
+          cat << EOF > /tmp/job.yaml
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: tpcc{{inputs.parameters.id}}-{{inputs.parameters.action}}-{{workflow.uid}}
+            labels:
+              app: tpcc
+          spec:
+            backoffLimit: 0
+            parallelism: 1
+            template:
+              metadata:
+                labels:
+                  app: tpcc
+              spec:
+                nodeSelector:
+                  pool: benchmark
+                tolerations:
+                - effect: NoSchedule
+                  key: dedicated
+                  operator: Equal
+                  value: benchmark
+                containers:
+                  - name: tpcc
+                    image: aylei/go-tpc:20201027
+                    command:
+                      - /bin/sh
+                      - -c
+                      - |-
+                        set -x
+                        set -euo pipefail
+                        elapseTime=0
+                        threshold=600
+                        while true; do
+                            sleep 5
+                            elapseTime=\$(( elapseTime+5 ))
+
+                            if [[ \${elapseTime} -ge \${threshold} ]]
+                            then
+                                echo "waiting for TiDB endpoint ready timeout" >&2
+                                exit 1
+                            fi
+
+                            if nslookup \${TIDB_HOST} 2>/dev/null
+                            then
+                                echo "nslookup domain \${TIDB_HOST} success"
+                                break
+                            else
+                                echo "nslookup domain \${TIDB_HOST} failed" >&2
+                            fi
+                        done
+                        case \${ACTION} in
+                          prepare)
+                            mysql -h\${TIDB_HOST} -P\${TIDB_PORT} -p\${PASSWORD} -e "DROP DATABASE IF EXISTS tpcc; CREATE DATABASE tpcc;"
+                            /go-tpc -H=\${TIDB_HOST} -P=\${TIDB_PORT} -p=\${PASSWORD} -D=tpcc --warehouses=\${WAREHOUSES} tpcc prepare
+                            ;;
+                          run)
+                            /go-tpc -H=\${TIDB_HOST} -P=\${TIDB_PORT} -p=\${PASSWORD} -D=tpcc --warehouses=\${WAREHOUSES} --time=\${DURATION} --ignore-error tpcc run
+                            ;;
+                          check)
+                            /go-tpc -H=\${TIDB_HOST} -P=\${TIDB_PORT} -p=\${PASSWORD} -D=tpcc --warehouses=\${WAREHOUSES} tpcc check
+                            ;;
+                        esac
+                    env:
+                      - name: TIDB_HOST
+                        value: "db-tidb.tidb{{workflow.outputs.parameters.tidb-id}}"
+                      - name: TIDB_PORT
+                        value: "{{workflow.outputs.parameters.tidb-port}}"
+                      - name: PASSWORD
+                        value: "{{workflow.outputs.parameters.tidb-password}}"
+                      - name: WAREHOUSES
+                        value: "{{inputs.parameters.warehouses}}"
+                      - name: DURATION
+                        value: "{{workflow.parameters.duration}}"
+                      - name: TERMINALS
+                        value: "{{workflow.parameters.terminals}}"
+                      - name: ACTION
+                        value: "{{inputs.parameters.action}}"
+                restartPolicy: Never
+          EOF
+  entrypoint: bench-adhoc
+  arguments:
+    parameters:
+      - name: tier
+        value: t1.standard
+      - name: region
+        value: us-west-2
+      - name: provider
+        value: aws
+      - name: repeats
+        value: '1'
+      - name: warehouses
+        value: '1000'
+      - name: duration
+        value: 10m
+      - name: terminals
+        value: '100'
+      - name: tikv-version
+        value: v4.0.7
+      - name: tidb-version
+        value: v4.0.7
+      - name: pd-version
+        value: v4.0.7
+      - name: tidb-config
+        value: ''
+      - name: pd-config
+        value: ''
+      - name: tikv-config
+        value: ''
+      - name: suite
+        value: default
+  serviceAccountName: workflow
+  ttlStrategy:
+    secondsAfterCompletion: 120
+  podGC:
+    strategy: OnPodCompletion

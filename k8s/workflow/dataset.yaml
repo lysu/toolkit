@@ -1,0 +1,134 @@
+metadata:
+  name: dataset
+  namespace: argo
+  selfLink: /apis/argoproj.io/v1alpha1/namespaces/argo/workflowtemplates/dataset
+  uid: 95e7181c-3576-46f4-b5e3-a636b119a856
+  resourceVersion: '121247431'
+  generation: 1
+  creationTimestamp: '2020-11-03T08:10:12Z'
+  labels:
+    app.kubernetes.io/managed-by: pulumi
+    type: util
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"WorkflowTemplate","metadata":{"labels":{"app.kubernetes.io/managed-by":"pulumi","type":"util"},"name":"dataset","namespace":"argo"},"spec":{"templates":[{"inputs":{"parameters":[{"name":"kubeconfig-secret"},{"name":"ns"}]},"name":"ycsb-2TB","outputs":{"parameters":[{"name":"scale","valueFrom":{"default":"3160518000","parameter":"foobar"}}]},"steps":[[{"arguments":{"artifacts":[{"name":"source","raw":{"data":"s3:\n
+      secretName: storage-credential\n  region: us-west-2\n  provider: aws\n
+      bucket: dbaas-benchmark\n  prefix:
+      ycsb-2TB\n"}}],"parameters":[{"name":"kubeconfig-secret","value":"{{inputs.parameters.kubeconfig-secret}}"},{"name":"ns","value":"{{inputs.parameters.ns}}"},{"name":"storage-credential-secret","value":"s3-credential"}]},"name":"restore","templateRef":{"name":"utilities","template":"restore-and-wait"}}]]},{"inputs":{"parameters":[{"name":"kubeconfig-secret"},{"name":"ns"}]},"name":"ycsb-1000000000","outputs":{"parameters":[{"name":"scale","valueFrom":{"default":"2000000000","parameter":"foobar"}}]},"steps":[[{"arguments":{"artifacts":[{"name":"source","raw":{"data":"s3:\n
+      secretName: storage-credential\n  region: us-west-2\n  provider: aws\n
+      bucket: dbaas-benchmark\n  prefix:
+      ycsb-2000000000\n"}}],"parameters":[{"name":"kubeconfig-secret","value":"{{inputs.parameters.kubeconfig-secret}}"},{"name":"ns","value":"{{inputs.parameters.ns}}"},{"name":"storage-credential-secret","value":"s3-credential"}]},"name":"restore","templateRef":{"name":"utilities","template":"restore-and-wait"}}]]},{"inputs":{"parameters":[{"name":"kubeconfig-secret"},{"name":"ns"}]},"name":"tpcc-10000","outputs":{"parameters":[{"name":"scale","valueFrom":{"default":"10000","parameter":"foobar"}}]},"steps":[[{"arguments":{"artifacts":[{"name":"source","raw":{"data":"s3:\n
+      secretName: storage-credential\n  region: us-west-2\n  provider: aws\n
+      bucket: dbaas-benchmark\n  prefix:
+      tpcc-10000\n"}}],"parameters":[{"name":"kubeconfig-secret","value":"{{inputs.parameters.kubeconfig-secret}}"},{"name":"ns","value":"{{inputs.parameters.ns}}"},{"name":"storage-credential-secret","value":"s3-credential"}]},"name":"restore","templateRef":{"name":"utilities","template":"restore-and-wait"}}]]}]}}
+spec:
+  templates:
+    - name: ycsb-2TB
+      arguments: {}
+      inputs:
+        parameters:
+          - name: kubeconfig-secret
+          - name: ns
+      outputs:
+        parameters:
+          - name: scale
+            valueFrom:
+              parameter: foobar
+              default: '3160518000'
+      metadata: {}
+      steps:
+        - - name: restore
+            arguments:
+              parameters:
+                - name: kubeconfig-secret
+                  value: '{{inputs.parameters.kubeconfig-secret}}'
+                - name: ns
+                  value: '{{inputs.parameters.ns}}'
+                - name: storage-credential-secret
+                  value: s3-credential
+              artifacts:
+                - name: source
+                  raw:
+                    data: |
+                      s3:
+                        secretName: storage-credential
+                        region: us-west-2
+                        provider: aws
+                        bucket: dbaas-benchmark
+                        prefix: ycsb-2TB
+            templateRef:
+              name: utilities
+              template: restore-and-wait
+    - name: ycsb-1000000000
+      arguments: {}
+      inputs:
+        parameters:
+          - name: kubeconfig-secret
+          - name: ns
+      outputs:
+        parameters:
+          - name: scale
+            valueFrom:
+              parameter: foobar
+              default: '2000000000'
+      metadata: {}
+      steps:
+        - - name: restore
+            arguments:
+              parameters:
+                - name: kubeconfig-secret
+                  value: '{{inputs.parameters.kubeconfig-secret}}'
+                - name: ns
+                  value: '{{inputs.parameters.ns}}'
+                - name: storage-credential-secret
+                  value: s3-credential
+              artifacts:
+                - name: source
+                  raw:
+                    data: |
+                      s3:
+                        secretName: storage-credential
+                        region: us-west-2
+                        provider: aws
+                        bucket: dbaas-benchmark
+                        prefix: ycsb-2000000000
+            templateRef:
+              name: utilities
+              template: restore-and-wait
+    - name: tpcc-10000
+      arguments: {}
+      inputs:
+        parameters:
+          - name: kubeconfig-secret
+          - name: ns
+      outputs:
+        parameters:
+          - name: scale
+            valueFrom:
+              parameter: foobar
+              default: '10000'
+      metadata: {}
+      steps:
+        - - name: restore
+            arguments:
+              parameters:
+                - name: kubeconfig-secret
+                  value: '{{inputs.parameters.kubeconfig-secret}}'
+                - name: ns
+                  value: '{{inputs.parameters.ns}}'
+                - name: storage-credential-secret
+                  value: s3-credential
+              artifacts:
+                - name: source
+                  raw:
+                    data: |
+                      s3:
+                        secretName: storage-credential
+                        region: us-west-2
+                        provider: aws
+                        bucket: dbaas-benchmark
+                        prefix: tpcc-10000
+            templateRef:
+              name: utilities
+              template: restore-and-wait
+  arguments: {}

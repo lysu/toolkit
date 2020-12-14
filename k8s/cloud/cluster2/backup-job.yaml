@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tpcc-backup
+  labels:
+    app: backup
+spec:
+  backoffLimit: 0
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: backup
+    spec:
+      containers:
+        - name: br-sql
+          image: mysql:5.7
+          command:
+            - /bin/sh
+            - -c
+            - |-
+              set -x
+              mysql -h${TIDB_HOST} -P${TIDB_PORT} -p${PASSWORD} -e "backup database tpcc to 's3://dbaas-benchmark/tpcc5k-clusterindex?region=us-west-2&access-key=${ACCESS_KEY}&secret-access-key=${SECRET_KEY}'"
+          env:
+            - name: TIDB_HOST
+              value: "${ENV_TIDB_HOST}"
+            - name: TIDB_PORT
+              value: "${ENV_TIDB_PORT}"
+            - name: PASSWORD
+              value: "${ENV_PASSWORD}"
+            - name: ACCESS_KEY
+              value: "${ENV_ACCESS_KEY}"
+            - name: SECRET_KEY
+              value: "${ENV_SECRET_KEY}"
+      restartPolicy: Never

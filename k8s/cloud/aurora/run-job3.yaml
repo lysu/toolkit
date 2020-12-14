@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tpcc-run-30k
+  labels:
+    app: tpcc
+spec:
+  backoffLimit: 0
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: tpcc
+    spec:
+      nodeSelector:
+        pool: benchmark
+      tolerations:
+        - effect: NoSchedule
+          key: dedicated
+          operator: Equal
+          value: benchmark
+      containers:
+        - name: tpcc
+          image: lysu/go-tpc:latest
+          command:
+            - /bin/sh
+            - -c
+            - |-
+              set -x
+              set -euo pipefail
+              elapseTime=0
+              threshold=600
+              while true; do
+                  sleep 5
+                  elapseTime=$(( elapseTime+5 ))
+
+                  if [[ ${elapseTime} -ge ${threshold} ]]
+                  then
+                      echo "waiting for TiDB endpoint ready timeout" >&2
+                      exit 1
+                  fi
+
+                  if nslookup ${TIDB_HOST} 2>/dev/null
+                  then
+                      echo "nslookup domain ${TIDB_HOST} success"
+                      break
+                  else
+                      echo "nslookup domain ${TIDB_HOST} failed" >&2
+                  fi
+              done
+              /go-tpc -U=admin -H=${TIDB_HOST} -P=${TIDB_PORT} -p=${PASSWORD} -D=tpcc --warehouses=${WAREHOUSES} -T=${TERMINALS} --time=${DURATION} --ignore-error tpcc run
+          env:
+            - name: TIDB_HOST
+              value: "${ENV_TIDB_HOST}"
+            - name: TIDB_PORT
+              value: "${ENV_TIDB_PORT}"
+            - name: PASSWORD
+              value: "${ENV_PASSWORD}"
+            - name: WAREHOUSES
+              value: "30000"
+            - name: DURATION
+              value: "15m"
+            - name: TERMINALS
+              value: "128"
+      restartPolicy: Never
